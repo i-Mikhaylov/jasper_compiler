@@ -2,7 +2,7 @@ import net.sf.jasperreports.engine.{JRException, JasperCompileManager, JasperRep
 import net.sf.jasperreports.engine.util.{JRLoader, JRSaver}
 import net.sf.jasperreports.engine.xml.JRXmlLoader
 
-import java.io.File
+import java.io.{File, FilenameFilter}
 import scala.util.{Failure, Success, Try}
 
 object Main {
@@ -20,16 +20,23 @@ object Main {
     }
   }
 
-  def filterValid(paths: Iterable[String]): Iterable[String] = paths.flatMap { path =>
-    val file = new File(path)
-    if (file.isFile) path :: Nil
-    else if (file.isDirectory) filterValid(file.list)
-    else { println(s"File $path doesn't exist"); Nil }
+  object JrxmlFilter extends FilenameFilter {
+    def accept(dir: File, name: String): Boolean = name.endsWith(".jrxml")
   }
 
-  def run(args: Iterable[String]): Unit = {
+  def filterValidFiles(files: Iterable[File], depth: Int): Iterable[String] = files.flatMap { file =>
+    if (file.isFile) file.getAbsolutePath :: Nil
+    else if (file.isDirectory && depth > 0) filterValidFiles(file.listFiles(JrxmlFilter), depth - 1)
+    else if (file.isDirectory) Nil
+    else { println(s"File ${file.getAbsolutePath} doesn't exist"); Nil }
+  }
+
+  def filterValid(paths: Iterable[String], depth: Int): Iterable[String] =
+    filterValidFiles(paths.map(new File(_)), depth)
+
+  def compile(validArgs: Iterable[String]): Unit = {
     for {
-      jrxml <- filterValid(args)
+      jrxml <- validArgs
       outputPath <- Some(jrxml).collect { case s"$prefix.jrxml" => s"$prefix.jasper" }
         .orPrint(s"$jrxml doesn't end with .jrxml")
       input = JRLoader.getFileInputStream(jrxml)
@@ -42,6 +49,11 @@ object Main {
       .map { _ => println(s"Compiled $jrxml successfully") }
   }
 
-  def main(args: Array[String]): Unit = run(args ++ List("gg"))
+  def main(args: Array[String]): Unit = if (args.nonEmpty) {
+    val validArgs =
+      if (args.head == "-r") filterValid(args.tail, Int.MaxValue)
+      else filterValid(args, 1)
+    compile(validArgs)
+  } else println("Empty arguments")
 
 }
