@@ -50,7 +50,7 @@ object Main {
       if (source.isFile) compile(source, destination)
       else if (source.isDirectory) source.listFiles().foreach { f => if (f.isFile) compile(f, destination) }
       else throw new FileSystemException(s"${source.getAbsolutePath}: Illegal file ")
-    case _ => throw new IllegalArgumentException("Invalid argument number")
+    case _ => throw new IllegalArgumentException(s"Invalid argument number (${args.length}), but 2 expected")
   }
 
 }
