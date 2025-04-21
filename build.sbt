@@ -1,10 +1,7 @@
-ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "2.13.11"
+ThisBuild / version := "1.0"
+ThisBuild / scalaVersion := "3.5.2"
 
-lazy val root = (project in file("."))
-  .settings(
-    name := "jasper_compiler"
-  )
+lazy val root = (project in file(".")).settings(name := "jasper_compiler")
 
 resolvers += "jaspersoft-third-party" at "https://jaspersoft.jfrog.io/jaspersoft/third-party-ce-artifacts/"
 resolvers += "jr-ce-releases" at "https://jaspersoft.jfrog.io/jaspersoft/jr-ce-releases/"
