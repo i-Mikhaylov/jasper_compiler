@@ -9,14 +9,13 @@ import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 
-object Printer {
+object Printer:
   private def coloredPrint(message: String, ansiColor: AnsiColor => String)(implicit file: File): Unit =
     println(file.getAbsolutePath + ": " + ansiColor(Console) + message + Console.RESET)
   def printSuccess(message: String)(implicit file: File): Unit = coloredPrint(message, _.GREEN)
   def printWarn   (message: String)(implicit file: File): Unit = coloredPrint(message, _.YELLOW)
   def printInfo   (message: String)(implicit file: File): Unit = coloredPrint(message, _.YELLOW)
   def printError  (message: String)(implicit file: File): Unit = coloredPrint(message, _.RED)
-}
 
 implicit class PrintError[T](result: Try[T]):
   def orPrint(message: String)(implicit file: File): Option[T] = result match {
@@ -32,7 +31,7 @@ object Rewriter:
     instances.foldLeft(orig) { (data, rewriter) => rewriter.rewrite(data)(file) getOrElse data }
 
 abstract class Rewriter:
-  val _: Unit = { Rewriter.instances = this :: Rewriter.instances }
+  Rewriter.instances = this :: Rewriter.instances
   def rewrite(orig: String)(implicit file: File): Option[String]
 
 val JsonSourceRewriter: Rewriter = new Rewriter():
@@ -51,7 +50,7 @@ val SubreportDirectoryRewriter: Rewriter = new Rewriter():
     val prefix = matched.source.subSequence(matched.start(0), matched.start(1)).toString
     val value  = matched.source.subSequence(matched.start(1), matched.end(1)).toString
     val suffix = matched.source.subSequence(matched.end(1), matched.end(0)).toString
-    if (value startsWith "./reports")
+    if (value.startsWith("./reports"))
       printWarn(s"Subreport expression is already contains subdirectory - \"$value\"")
       prefix + value + suffix
     else
@@ -65,18 +64,20 @@ val SubreportDirectoryRewriter: Rewriter = new Rewriter():
 
 object Main:
 
-  def compile(source: File, destination: File): Unit =
+  def compile(source: File, destinationDir: File): Unit =
     implicit val printSource: File = source
-    val convertedXml = Rewriter.rewrite(source).getBytes
-    val input = new ByteArrayInputStream(convertedXml)
-
-    for {
-      outputName <- Some(source.getName).collect { case s"$prefix.jrxml" => s"$prefix.jasper" }
+    lazy val convertedXml = Rewriter.rewrite(source).getBytes
+    lazy val input = new ByteArrayInputStream(convertedXml)
+    for
+      destination <- Some(source.getName).collect { case s"$prefix.jrxml" => new File(destinationDir, s"$prefix.jasper") }
+      upToDate = source.lastModified < destination.lastModified
+      _ = if (upToDate) printInfo("Is up to date")
+      if !upToDate
       report <- Try { JasperCompileManager.compileReport(input) }.orPrint(s"Error compiling report")
-    } yield Try { JRSaver.saveObject(report, new File(destination, outputName)) }
-      .orPrint("Error saving compiled report")
-      .map { _ => Files.write(new File(destination, source.getName).toPath, convertedXml) }
-      .map { _ => printSuccess("Compiled successfully") }
+      success <- Try { JRSaver.saveObject(report, destination) }.orPrint("Error saving compiled report")
+    yield
+      Files.write(new File(destinationDir, source.getName).toPath, convertedXml)
+      printSuccess("Compiled successfully")
 
   def main(args: Array[String]): Unit = args.map(new File(_)) match {
     case Array(source, destination) =>
