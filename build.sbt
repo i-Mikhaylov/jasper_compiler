@@ -6,3 +6,8 @@ lazy val root = (project in file(".")).settings(name := "jasper_compiler")
 resolvers += "jaspersoft-third-party" at "https://jaspersoft.jfrog.io/jaspersoft/third-party-ce-artifacts/"
 resolvers += "jr-ce-releases" at "https://jaspersoft.jfrog.io/jaspersoft/jr-ce-releases/"
 libraryDependencies += "net.sf.jasperreports" % "jasperreports" % "6.9.0"
+
+Compile / packageBin / packageOptions += {
+  val classPaths = (Compile / dependencyClasspath).value.map(_.data.toURI.toURL.toString)
+  Package.ManifestAttributes("Class-Path" -> classPaths.mkString(" "))
+}
